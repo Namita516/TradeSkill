@@ -1,0 +1,217 @@
+:root {
+  --primary: #6366f1;
+  --bg-light: #f8fafc;
+  --text-dark: #0f172a;
+  --teach-color: #10b981;
+  --learn-color: #3b82f6;
+}
+
+.home-container {
+  background-color: var(--bg-light);
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Nav Styles */
+.home-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 5%;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.logo { font-size: 20px; color: var(--primary); font-weight: 800; }
+.nav-link { background: none; border: none; cursor: pointer; font-weight: 600; margin-right: 20px; }
+.logout-btn-small { color: #ef4444; border: none; background: none; cursor: pointer; font-size: 14px; }
+
+/* Hero Styles */
+.hero {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  padding: 60px 20px;
+  text-align: center;
+  color: white;
+}
+
+.hero h2 { margin-bottom: 25px; font-size: 28px; }
+
+.search-box {
+  display: flex;
+  max-width: 600px;
+  margin: 0 auto;
+  background: white;
+  padding: 5px;
+  border-radius: 50px;
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 50px;
+  outline: none;
+}
+
+.search-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 10px 25px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* Feed Styles */
+.feed { padding: 40px 5%; }
+.feed-header { margin-bottom: 30px; }
+
+.partner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 25px;
+}
+
+/* Card Styles */
+.partner-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.partner-info { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.avatar-sm { width: 45px; height: 45px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+
+.trade-tags { margin-bottom: 15px; }
+.tag-group { margin-bottom: 10px; }
+.tag-group small { display: block; font-size: 10px; font-weight: 800; color: #94a3b8; margin-bottom: 4px; }
+
+.tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.teach-tag { background: #ecfdf5; color: var(--teach-color); }
+.learn-tag { background: #eff6ff; color: var(--learn-color); }
+
+.partner-bio { font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 20px; flex-grow: 1; }
+
+.propose-btn {
+  width: 100%;
+  padding: 12px;
+  background: white;
+  border: 2px solid var(--primary);
+  color: var(--primary);
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.propose-btn:hover { background: var(--primary); color: white; }
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .hero h2 { font-size: 22px; }
+  .search-box { flex-direction: column; background: transparent; }
+  .search-input { border-radius: 8px; margin-bottom: 10px; }
+  .search-btn { border-radius: 8px; width: 100%; }
+}
+.new-badge {
+  font-size: 9px;
+  background: #fef3c7;
+  color: #d97706;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+  border: 1px solid #fcd34d;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.notification-wrapper {
+  position: relative;
+  margin-right: 15px;
+}
+
+.notif-bell-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  position: relative;
+}
+
+.notif-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #ff4757;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 50%;
+  font-weight: bold;
+}
+
+.notif-dropdown {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  width: 250px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  z-index: 1000;
+  padding: 10px;
+  border: 1px solid #eee;
+}
+
+.notif-dropdown h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #333;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 5px;
+}
+
+.notif-item {
+  padding: 10px;
+  border-bottom: 1px solid #f9f9f9;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.notif-item:hover {
+  background: #f0f7ff;
+}
+
+.notif-item strong {
+  display: block;
+  font-size: 13px;
+}
+
+.notif-item p {
+  margin: 2px 0;
+  font-size: 12px;
+  color: #666;
+}
+
+.notif-item small {
+  font-size: 10px;
+  color: #999;
+}
+
+.no-notif {
+  text-align: center;
+  color: #999;
+  font-size: 12px;
+  padding: 10px;
+}

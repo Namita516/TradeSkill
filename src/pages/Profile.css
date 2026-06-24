@@ -1,0 +1,407 @@
+:root {
+  --primary: #6366f1;
+  --bg-dark: #0f172a;
+  --bg-light: #f8fafc;
+  --offer-green: #10b981;
+  --seek-blue: #3b82f6;
+}
+
+/* 1. Base Container: Mobile Default (Stacking) */
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--bg-light);
+  font-family: 'Inter', sans-serif;
+}
+
+/* 2. Responsive Layout Logic (Media Query) */
+@media (min-width: 1024px) {
+  .dashboard-container {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+  }
+
+  .profile-sidebar {
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: none;
+  }
+
+  .trade-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Sidebar Styling */
+.profile-sidebar {
+  background: white;
+  padding: 40px 30px;
+  border-bottom: 1px solid #e2e8f0; /* Added for mobile separation */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.profile-image {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, var(--primary), #a855f7);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 40px;
+  color: white;
+  font-weight: bold;
+  margin-bottom: 20px;
+  box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
+}
+
+.user-name { font-size: 22px; color: var(--bg-dark); margin-bottom: 5px; }
+.user-badge { font-size: 12px; background: #ede9fe; color: var(--primary); padding: 4px 12px; border-radius: 20px; font-weight: 700; text-transform: uppercase; }
+
+.user-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  margin: 30px 0;
+  padding: 20px 0;
+  border-top: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.stat-num { font-size: 20px; font-weight: bold; color: var(--bg-dark); }
+.stat-label { font-size: 12px; color: #64748b; }
+
+.user-bio { font-size: 14px; color: #475569; line-height: 1.6; }
+
+/* Main Content Styling */
+.profile-main { 
+  padding: 25px; /* Reduced for mobile */
+}
+
+@media (min-width: 1024px) {
+  .profile-main { padding: 50px; }
+}
+
+.section-title { font-size: 20px; margin-bottom: 25px; color: var(--bg-dark); }
+
+/* Trade Cards Responsive Grid */
+.trade-cards {
+  display: grid;
+  grid-template-columns: 1fr; /* Stacked on mobile */
+  gap: 30px;
+}
+
+.trade-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  transition: transform 0.3s ease;
+}
+
+.trade-card:hover { transform: translateY(-5px); }
+
+.card-header {
+  padding: 15px;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  color: white;
+}
+
+.offer-card .card-header { background: var(--offer-green); }
+.seek-card .card-header { background: var(--seek-blue); }
+
+.trade-card ul { list-style: none; padding: 25px; }
+.trade-card li { margin-bottom: 12px; font-weight: 500; color: #334155; display: flex; align-items: center; }
+.trade-card li span { margin-right: 10px; }
+
+.edit-mini {
+  width: 100%;
+  padding: 12px;
+  background: #f8fafc;
+  border: none;
+  border-top: 1px solid #f1f5f9;
+  cursor: pointer;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.logout-btn {
+  margin-top: 20px; /* Space for mobile */
+  color: #ef4444;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+@media (min-width: 1024px) {
+  .logout-btn {
+    margin-top: auto;
+    padding-top: 20px;
+  }
+}
+
+
+.search-nav-btn {
+  width: 100%;
+  margin-top: 15px;
+  padding: 12px;
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.2s, background-color 0.2s;
+  box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2);
+}
+
+.search-nav-btn:hover {
+  background-color: #4f46e5;
+  transform: translateY(-2px);
+}
+
+.search-nav-btn:active {
+  transform: translateY(0);
+}
+
+/* Ensure the button looks good on very small screens */
+@media (max-width: 480px) {
+  .search-nav-btn {
+    font-size: 16px; /* Larger text for better mobile tapping */
+    padding: 14px;
+  }
+}
+
+/* Modal System */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.modal-content h3 {
+  color: var(--bg-dark);
+  margin-bottom: 10px;
+}
+
+.modal-content input, .modal-content textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.modal-content textarea {
+  height: 100px;
+  resize: none;
+}
+
+.modal-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.modal-btns button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+
+.save-btn { background: var(--primary); color: white; }
+.cancel-btn { background: #f1f5f9; color: #64748b; }
+
+/* Edit Profile Button (Sidebar) */
+.edit-profile-btn {
+  margin-bottom: 15px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.edit-profile-btn:hover {
+  background: var(--primary);
+  color: white;
+}
+
+/* --- PROFILE INBOX SECTION --- */
+.inbox-section {
+  margin-top: 40px;
+  background: white;
+  padding: 25px;
+  border-radius: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* Individual Card Styling */
+.inbox-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 18px;
+  background: #f8fafc;
+  border-radius: 16px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease-in-out;
+}
+
+.inbox-card:hover {
+  background: white;
+  border-color: var(--primary);
+  transform: translateX(8px);
+  box-shadow: 0 5px 15px rgba(99, 102, 241, 0.1);
+}
+
+/* Unread State - Soft Blue Background */
+.unread-bg {
+  background: #eef2ff;
+  border-left: 5px solid var(--primary);
+}
+
+/* Avatar Circle */
+.inbox-avatar {
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, var(--primary), #818cf8);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.inbox-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.inbox-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.inbox-row strong {
+  font-size: 16px;
+  color: var(--bg-dark);
+}
+
+/* Notification Badge */
+.notification-dot {
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  animation: pulse 2s infinite;
+}
+
+/* Message Preview (Truncated) */
+.last-msg-preview {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90%;
+}
+
+/* Empty State Styling */
+.empty-msg {
+  text-align: center;
+  padding: 30px;
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 14px;
+}
+
+/* Subtle Pulse Animation for New Messages */
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Responsive adjustments for smaller mobile screens */
+@media (max-width: 480px) {
+  .inbox-section {
+    padding: 15px;
+  }
+  .inbox-card {
+    padding: 12px;
+  }
+  .inbox-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+}
+/* The Replied Tag in Profile */
+.replied-status-tag {
+  background-color: #25d366; /* WhatsApp Green */
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  animation: pulse 2s infinite;
+}
+
+.inbox-card.has-reply {
+  background-color: #f0fff4; /* Light green tint for new replies */
+  border-left: 4px solid #25d366;
+}
