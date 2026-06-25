@@ -244,8 +244,16 @@ const Chatbox = () => {
 
       <main className="chat-main">
         <header className="chat-info-bar">
+          {/* Mobile specific back option wrapper */}
+          <div className="mobile-back-wrapper" onClick={() => navigate('/home')}>
+            <span className="back-icon">←</span> 
+          </div>
+
           <div className="partner-profile">
-            <div className="avatar-med">{partner?.name?.charAt(0) || "?"}</div>
+            <div className="status-ring">
+              <div className="avatar-med">{partner?.name?.charAt(0) || "?"}</div>
+              <div className="online-pulse"></div>
+            </div>
             <div className="partner-details">
               <h3>{partner?.name || "User"}</h3>
               <p>
@@ -256,11 +264,10 @@ const Chatbox = () => {
               </p>
             </div>
           </div>
-          <div className="header-tools">
-            <button className="start-workspace-btn" onClick={handleEnterSession}>
-              Enter Session 🚀
-            </button>
-          </div>
+          
+          <button className="start-workspace-btn" onClick={handleEnterSession}>
+            🚀 <span>Enter Session</span>
+          </button>
         </header>
 
         <div className="chat-feed" ref={scrollRef}>

@@ -142,14 +142,6 @@
   cursor: pointer;
 }
 
-/* RESPONSIVE */
-@media (max-width: 768px) {
-  .chat-nav { display: none; }
-  .chat-feed { padding: 20px; }
-  .msg-bubble { max-width: 85%; }
-  .header-tools { display: none; }
-  .chat-input-container { padding: 15px; }
-}
 .start-workspace-btn {
   background: var(--primary);
   color: white;
@@ -172,197 +164,55 @@
   box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
 }
 
-/* For mobile: hide the text and just show the rocket icon if space is tight */
-@media (max-width: 600px) {
-  .start-workspace-btn {
-    padding: 10px;
-    font-size: 18px;
-  }
-  .start-workspace-btn span {
-    display: none; /* Only if you wrap the text in a <span> */
-  }
-}
-:root {
-  --primary: #6366f1;
-  --bg-dark: #0f172a;
-  --bg-light: #f8fafc;
-  --border: #e2e8f0;
+/* Fallback utilities to make back layout connection seamless */
+.mobile-back-wrapper {
+  display: none;
 }
 
-.chatbox-master {
-  display: flex;
-  height: 100vh;
-  background: white;
-  font-family: 'Inter', sans-serif;
-  overflow: hidden;
-}
-
-/* Slim Left Nav */
-.chat-nav {
-  width: 80px;
-  background: var(--bg-dark);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 20px 0;
-}
-
-.back-icon { color: white; cursor: pointer; font-size: 20px; margin-bottom: 40px; opacity: 0.6; transition: 0.3s; }
-.back-icon:hover { opacity: 1; transform: scale(1.1); }
-
-.swap-thumb {
-  width: 45px;
-  height: 45px;
-  border-radius: 12px;
-  background: #1e293b;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 15px;
-  cursor: pointer;
-  font-weight: bold;
-  border: 2px solid transparent;
-}
-
-.swap-thumb.active { border-color: var(--primary); background: var(--primary); }
-.swap-thumb.pending { opacity: 0.4; }
-
-/* Main Section */
-.chat-main { flex: 1; display: flex; flex-direction: column; background: #fff; }
-
-.chat-info-bar {
-  padding: 15px 30px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.partner-profile { display: flex; align-items: center; gap: 15px; }
-.avatar-med { width: 44px; height: 44px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-
-.status-ring { position: relative; }
-.online-pulse {
-  width: 12px;
-  height: 12px;
-  background: #10b981;
-  border-radius: 50%;
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  border: 2px solid white;
-}
-
-.partner-details h3 { font-size: 16px; margin: 0; color: var(--bg-dark); }
-.partner-details p { font-size: 12px; color: #64748b; margin: 2px 0 0; }
-.partner-details p span { color: var(--primary); font-weight: 600; }
-
-.tool-btn {
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: none;
-  background: #eef2ff;
-  color: var(--primary);
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  margin-left: 10px;
-}
-
-.tool-btn.secondary { background: #f1f5f9; color: #475569; }
-
-/* Chat Feed */
-.chat-feed {
-  flex: 1;
-  padding: 20px 40px;
-  overflow-y: auto;
-  background: #fbfcfe;
-  display: flex;
-  flex-direction: column;
-}
-
-.date-divider { text-align: center; font-size: 11px; color: #94a3b8; text-transform: uppercase; margin: 20px 0; letter-spacing: 1px; }
-
-.msg-bubble-wrapper { display: flex; width: 100%; margin-bottom: 15px; }
-.msg-bubble-wrapper.sent { justify-content: flex-end; }
-
-.msg-bubble {
-  max-width: 60%;
-  padding: 12px 18px;
-  border-radius: 20px;
-  font-size: 14px;
-  line-height: 1.5;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-}
-
-.sent .msg-bubble { background: var(--primary); color: white; border-bottom-right-radius: 2px; }
-.received .msg-bubble { background: white; color: var(--bg-dark); border-bottom-left-radius: 2px; border: 1px solid var(--border); }
-
-.msg-time { font-size: 10px; display: block; margin-top: 5px; opacity: 0.7; text-align: right; }
-
-/* Input */
-.chat-input-container { padding: 20px 40px; border-top: 1px solid var(--border); }
-.chat-form { display: flex; gap: 15px; align-items: center; }
-
-.attach-btn { background: #f1f5f9; border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; color: #64748b; cursor: pointer; }
-
-.chat-form input {
-  flex: 1;
-  padding: 14px 20px;
-  border: 1px solid var(--border);
-  border-radius: 30px;
-  outline: none;
-  background: #f8fafc;
-}
-
-.send-action-btn {
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 10px 25px;
-  border-radius: 30px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-/* RESPONSIVE */
+/* --- RESPONSIVE FIXES FOR MOBILE --- */
 @media (max-width: 768px) {
-  .chat-nav { display: none; }
-  .chat-feed { padding: 20px; }
-  .msg-bubble { max-width: 85%; }
-  .header-tools { display: none; }
-  .chat-input-container { padding: 15px; }
-}
-.start-workspace-btn {
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-weight: 700;
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
-}
+  .chat-nav { 
+    display: none; 
+  }
+  
+  .chat-feed { 
+    padding: 20px; 
+  }
+  
+  .msg-bubble { 
+    max-width: 85%; 
+  }
+  
+  .chat-input-container { 
+    padding: 15px; 
+  }
 
-.start-workspace-btn:hover {
-  background: #4f46e5;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
-}
+  .chat-info-bar {
+    padding: 12px 15px;
+  }
 
-/* For mobile: hide the text and just show the rocket icon if space is tight */
-@media (max-width: 600px) {
+  /* Exposes and shapes back wrapper inside white info bar */
+  .mobile-back-wrapper {
+    display: flex !important;
+    align-items: center;
+    margin-right: 10px;
+    cursor: pointer;
+  }
+
+  .mobile-back-wrapper .back-icon {
+    color: var(--bg-dark);
+    margin-bottom: 0 !important;
+    font-size: 22px;
+    opacity: 0.8;
+  }
+
+  /* Shrinks button space instead of completely hiding header tools */
   .start-workspace-btn {
     padding: 10px;
-    font-size: 18px;
+    font-size: 16px;
   }
+  
   .start-workspace-btn span {
-    display: none; /* Only if you wrap the text in a <span> */
+    display: none; /* Safely hides text label on smaller viewports */
   }
 }

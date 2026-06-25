@@ -122,19 +122,19 @@
     width: 100%;
     padding: 10px;
   }
-
-  .trade-divider {
-    flex-direction: row; /* Turn vertical line horizontal */
+.trade-divider {
+    flex-direction: row;        /* Overrides the vertical column layout */
     width: 100%;
     height: auto;
     margin: 20px 0;
+    transform: none !important; /* Forces the container to stay flat, removing the vertical line artifact */
   }
 
   .trade-divider .line {
-    width: 40%;
-    height: 1px; /* Line goes across now */
+    width: 40%;                 /* Spans the line horizontally across the screen */
+    height: 1px;                /* flattens it down to a 1px separator line */
   }
-
+  
   .swap-icon {
     margin: 0 15px;
   }
