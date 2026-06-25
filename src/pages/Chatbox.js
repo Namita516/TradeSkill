@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { putItem, queryItems, scanItems } from '../awsConfig';
 import { getCanonicalId } from '../utils/idUtils';
@@ -10,8 +10,13 @@ const Chatbox = () => {
   const scrollRef = useRef(null);
 
   const partner = location.state?.partner;
-// eslint-disable-next-line react-hooks/exhaustive-deps
-const myData = JSON.parse(sessionStorage.getItem('currentUser')) || { name: "Guest" };  const myName = myData.name;
+
+  // Wrapped in useMemo to prevent unnecessary dependency changes on re-renders
+  const myData = useMemo(() => {
+    return JSON.parse(sessionStorage.getItem('currentUser')) || { name: "Guest" };
+  }, []);
+
+  const myName = myData.name;
 
   // Prefer stable `userId` first, then email — keeps chat keys consistent across clients
   const myIdentifier = getCanonicalId(myData);
@@ -23,14 +28,14 @@ const myData = JSON.parse(sessionStorage.getItem('currentUser')) || { name: "Gue
   const sessionLink = `https://meet.jit.si/${roomName}`;
 
   useEffect(() => {
-  if (!myData?.email || !partner?.name) {
-    navigate('/home', { replace: true });
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [navigate]);
+    if (!myData?.email || !partner?.name) {
+      navigate('/home', { replace: true });
+    }
+  }, [navigate, myData, partner]);
 
   useEffect(() => {
     console.debug('[Chatbox] mount', { currentUser: myData, partner });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [message, setMessage] = useState("");
@@ -233,21 +238,21 @@ const myData = JSON.parse(sessionStorage.getItem('currentUser')) || { name: "Gue
           <div className="back-icon">✕</div>
         </div>
         <div className="active-swaps">
-          <div className="swap-thumb active">{partner.name.charAt(0)}</div>
+          <div className="swap-thumb active">{partner?.name?.charAt(0) || "?"}</div>
         </div>
       </nav>
 
       <main className="chat-main">
         <header className="chat-info-bar">
           <div className="partner-profile">
-            <div className="avatar-med">{partner.name.charAt(0)}</div>
+            <div className="avatar-med">{partner?.name?.charAt(0) || "?"}</div>
             <div className="partner-details">
-              <h3>{partner.name}</h3>
+              <h3>{partner?.name || "User"}</h3>
               <p>
                 Teaching{' '}
-                <span>{partner.teach || partner.skillsToTeach?.[0] || "Skills"}</span>
+                <span>{partner?.teach || partner?.skillsToTeach?.[0] || "Skills"}</span>
                 {' '}for{' '}
-                <span>{partner.learn || partner.skillsToLearn?.[0] || "Knowledge"}</span>
+                <span>{partner?.learn || partner?.skillsToLearn?.[0] || "Knowledge"}</span>
               </p>
             </div>
           </div>
@@ -261,7 +266,7 @@ const myData = JSON.parse(sessionStorage.getItem('currentUser')) || { name: "Gue
         <div className="chat-feed" ref={scrollRef}>
           {chatHistory.length === 0 && (
             <div className="date-divider">
-              Start of your journey with {partner.name}
+              Start of your journey with {partner?.name || "User"}
             </div>
           )}
           {chatHistory.map((msg) => (
@@ -298,7 +303,7 @@ const myData = JSON.parse(sessionStorage.getItem('currentUser')) || { name: "Gue
           <form className="chat-form" onSubmit={handleSend}>
             <input
               type="text"
-              placeholder={`Message ${partner.name}...`}
+              placeholder={`Message ${partner?.name || "User"}...`}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
             />
