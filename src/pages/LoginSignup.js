@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { putItem, getItem, scanItems } from '../awsConfig';
 import './LoginSignup.css';
 
 const LoginSignup = () => {
@@ -36,8 +37,6 @@ const LoginSignup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 1. Fetch the global "Database" list
-    const allUsers = JSON.parse(localStorage.getItem('allUsers')) || [];
     const hashedPassword = await hashText(formData.password);
 
     if (!isLogin) {
@@ -51,59 +50,66 @@ const LoginSignup = () => {
         return;
       }
 
-      // 2. Check if email already exists in the list
-      if (allUsers.some(u => u.email === formData.email)) {
-        showNotification("Email already registered!", "error");
-        return;
+      try {
+        // Check if email already exists by scanning Users table
+        const existingUsers = await scanItems('Users');
+        if (existingUsers.some(u => u.email === formData.email)) {
+          showNotification("Email already registered!", "error");
+          return;
+        }
+
+        // Create new user object
+        const userId = String(generateId()).toLowerCase();
+        const newUser = {
+          userId: userId,
+          email: formData.email,
+          password: hashedPassword,
+          name: formData.email.split('@')[0],
+          level: "New Member",
+          bio: "Skill swapper!",
+          skillsToTeach: [],
+          skillsToLearn: [],
+          // use ratingAverage/ratingCount for ratings; keep legacy fields for compatibility
+          ratingAverage: 0,
+          ratingCount: 0,
+          reputation: 0,
+          swaps: 0,
+          createdAt: new Date().toISOString()
+        };
+
+        // Write to Users table
+        await putItem('Users', newUser);
+
+        showNotification("Signup successful! Redirecting to login...", "success");
+        setTimeout(() => {
+          setIsLogin(true);
+          setFormData({ email: '', password: '', confirmPassword: '' });
+        }, 2000);
+      } catch (error) {
+        console.error('Signup error:', error);
+        showNotification("Signup failed! Please try again.", "error");
       }
-
-      // 3. Create a full user object to store in the list
-      const newUser = {
-        id: generateId(),
-        email: formData.email,
-        password: hashedPassword,
-        name: formData.email.split('@')[0], // Sets name to Sunil if email is sunil@mail.com
-        level: "New Member",
-        bio: "Skill swapper!",
-        skillsToTeach: [],
-        skillsToLearn: [],
-        reputation: 0,
-        swaps: 0
-      };
-
-      // 4. Save to the global list
-      allUsers.push(newUser);
-      localStorage.setItem('allUsers', JSON.stringify(allUsers));
-
-      showNotification("Signup successful! Redirecting to login...", "success");
-
-      // Redirect to login after 2 seconds
-      setTimeout(() => {
-        setIsLogin(true);
-        setFormData({ email: '', password: '', confirmPassword: '' });
-      }, 2000);
 
     } else {
       // --- LOGIN LOGIC ---
-      // 5. Look for user in the global list
-      const userAccount = allUsers.find(u =>
-        u.email === formData.email && u.password === hashedPassword
-      );
+      try {
+        // Scan Users table to find user by email
+        const allUsers = await scanItems('Users');
+        const userAccount = allUsers.find(u =>
+          u.email === formData.email && u.password === hashedPassword
+        );
 
-      if (userAccount) {
-        if (!userAccount.id) {
-          userAccount.id = generateId();
-          const updatedUsers = allUsers.map(u => u.email === userAccount.email ? userAccount : u);
-          localStorage.setItem('allUsers', JSON.stringify(updatedUsers));
+        if (userAccount) {
+          // Store user session
+          sessionStorage.setItem('currentUser', JSON.stringify(userAccount));
+          showNotification("Login successful! Welcome.", "success");
+          setTimeout(() => navigate('/profile'), 1500);
+        } else {
+          showNotification("Incorrect email or password!", "error");
         }
-
-        // 6. Set the active session (Who is logged in right now?)
-        sessionStorage.setItem('currentUser', JSON.stringify(userAccount));
-
-        showNotification("Login successful! Welcome.", "success");
-        setTimeout(() => navigate('/profile'), 1500);
-      } else {
-        showNotification("Incorrect email or password!", "error");
+      } catch (error) {
+        console.error('Login error:', error);
+        showNotification("Login failed! Please try again.", "error");
       }
     }
   };

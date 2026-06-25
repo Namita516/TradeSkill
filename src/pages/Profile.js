@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { putItem, queryItems, scanItems } from '../awsConfig';
 import './Profile.css';
 
 const Profile = () => {
@@ -14,67 +15,88 @@ const Profile = () => {
       bio: parsed?.bio || "Tell us about yourself!",
       skillsToTeach: parsed?.skillsToTeach || [],
       skillsToLearn: parsed?.skillsToLearn || [],
+      ratingAverage: parsed?.ratingAverage ?? parsed?.reputation ?? 0,
+      ratingCount: (parsed?.ratingCount ?? parsed?.swaps) || 0,
       reputation: parsed?.reputation || 0,
       swaps: parsed?.swaps || 0,
-      email: parsed?.email || ""
+      email: parsed?.email || "",
+      userId: parsed?.userId || ""
     };
   });
 
   const [inbox, setInbox] = useState([]);
 
-  // EFFECT 1: Pull fresh data
+  // EFFECT 1: Pull fresh data from DynamoDB
   useEffect(() => {
-    const sessionUser = JSON.parse(sessionStorage.getItem('currentUser'));
-    const allUsers = JSON.parse(localStorage.getItem('allUsers')) || [];
-    const freshData = allUsers.find(u => u.email === sessionUser?.email);
-    if (freshData) {
-      setUser({
-        ...freshData,
-        reputation: freshData.reputation || 0,
-        swaps: freshData.swaps || 0
-      });
-      sessionStorage.setItem('currentUser', JSON.stringify(freshData));
-    }
+    const loadUserData = async () => {
+      try {
+        const sessionUser = JSON.parse(sessionStorage.getItem('currentUser'));
+        if (sessionUser?.userId) {
+          // Get fresh user data from DynamoDB Users table
+          const freshData = await queryItems('Users', 'userId = :id', { ':id': sessionUser.userId });
+          if (freshData && freshData.length > 0) {
+            const userData = freshData[0];
+            setUser({
+              ...userData,
+              ratingAverage: userData.ratingAverage ?? userData.reputation ?? 0,
+              ratingCount: userData.ratingCount ?? userData.swaps ?? 0
+            });
+            sessionStorage.setItem('currentUser', JSON.stringify(userData));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load user data:', error);
+      }
+    };
+    loadUserData();
   }, []);
 
-  // EFFECT 2: Fetch Inbox
+  // EFFECT 2: Fetch Inbox from DynamoDB
   useEffect(() => {
-    const fetchInbox = () => {
-      const allInbox = JSON.parse(localStorage.getItem('inbox_heads')) || {};
-      const myName = user.name;
+    const fetchInbox = async () => {
+      try {
+        const sessionUser = JSON.parse(sessionStorage.getItem('currentUser'));
+        if (sessionUser?.userId) {
+          // Query InboxHeads table for current user
+          const inboxData = await queryItems('InboxHeads', 'userId = :userId', { ':userId': sessionUser.userId });
+          
+          const myChats = (inboxData || [])
+            .map((data) => ({
+              id: data.chatId,
+              partnerName: data.senderName,
+              lastMsg: data.lastMessage,
+              isUnread: data.unread === true,
+              senderData: data.senderData,
+              timestamp: data.timestamp
+            }))
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-      const myChats = Object.entries(allInbox)
-        .filter(([id, data]) => data.senderName === myName || data.receiverName === myName)
-        .map(([id, data]) => ({
-          id,
-          partnerName: data.senderName === myName ? data.receiverName : data.senderName,
-          lastMsg: data.lastMessage,
-          isUnread: data.unread && data.receiverName === myName,
-          senderData: data.senderData,
-          time: data.time
-        }))
-        .sort((a, b) => b.time - a.time);
-
-      setInbox(myChats);
+          setInbox(myChats);
+        }
+      } catch (error) {
+        console.error('Failed to load inbox:', error);
+        setInbox([]);
+      }
     };
 
     fetchInbox();
-    window.addEventListener('storage', fetchInbox);
-    return () => window.removeEventListener('storage', fetchInbox);
+    // Poll for new messages every 5 seconds
+    const interval = setInterval(fetchInbox, 5000);
+    return () => clearInterval(interval);
   }, [user.name]);
 
   const [modalType, setModalType] = useState(null);
   const [tempData, setTempData] = useState({});
   const [newItem, setNewItem] = useState("");
 
-  const syncUserUpdates = (updatedUser) => {
+  const syncUserUpdates = async (updatedUser) => {
     setUser(updatedUser);
     sessionStorage.setItem('currentUser', JSON.stringify(updatedUser));
-    const allUsers = JSON.parse(localStorage.getItem('allUsers')) || [];
-    const userIndex = allUsers.findIndex(u => u.email === updatedUser.email);
-    if (userIndex > -1) {
-      allUsers[userIndex] = updatedUser;
-      localStorage.setItem('allUsers', JSON.stringify(allUsers));
+    try {
+      // Update user in DynamoDB Users table
+      await putItem('Users', updatedUser);
+    } catch (error) {
+      console.error('Failed to sync user updates:', error);
     }
   };
 
@@ -88,13 +110,13 @@ const Profile = () => {
     setModalType(type);
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     const updatedUser = { ...user, ...tempData };
-    syncUserUpdates(updatedUser);
+    await syncUserUpdates(updatedUser);
     setModalType(null);
   };
 
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     if (!newItem) return;
     let updatedUser;
     if (modalType === 'skill') {
@@ -102,7 +124,7 @@ const Profile = () => {
     } else {
       updatedUser = { ...user, skillsToLearn: [...(user.skillsToLearn || []), newItem] };
     }
-    syncUserUpdates(updatedUser);
+    await syncUserUpdates(updatedUser);
     setModalType(null);
   };
 
@@ -169,12 +191,12 @@ const Profile = () => {
 
         <div className="user-stats">
           <div className="stat-item">
-            <p className="stat-num">{Math.round((user.reputation || 0) * 20)}%</p>
+            <p className="stat-num">{user.ratingAverage !== undefined ? `${Number(user.ratingAverage * 20).toFixed(0)}%` : 'New'}</p>
             <p className="stat-label">Reputation</p>
           </div>
           <div className="stat-item">
-            <p className="stat-num">{user.swaps}</p>
-            <p className="stat-label">Swaps</p>
+            <p className="stat-num">{user.ratingCount || user.swaps || 0}</p>
+            <p className="stat-label">Ratings</p>
           </div>
         </div>
 
@@ -237,7 +259,9 @@ const Profile = () => {
                       teach: chat.senderData?.teach || "Skills",
                       learn: chat.senderData?.learn || "Knowledge",
                       skillsToTeach: chat.senderData?.skillsToTeach || [],
-                      skillsToLearn: chat.senderData?.skillsToLearn || []
+                      skillsToLearn: chat.senderData?.skillsToLearn || [],
+                      email: chat.senderData?.email || chat.senderData?.contact || undefined,
+                      userId: chat.senderData?.userId || chat.senderData?.id || undefined
                     }
                   }
                 })}

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { putItem, getItem, scanItems } from '../awsConfig';
+import { getCanonicalId } from '../utils/idUtils';
 import './Workspace.css';
 
 const Workspace = () => {
@@ -9,10 +11,11 @@ const Workspace = () => {
 
   const partner = location.state?.partner || {};
   const partnerName = partner.name || "Partner";
-  const partnerId = partner.id || partner.email || partnerName;
+  const partnerId = getCanonicalId(partner);
   const myData = JSON.parse(sessionStorage.getItem('currentUser')) || {};
   const myName = myData.name || "User";
-  const myId = myData.id || myName;
+  const myId = getCanonicalId(myData);
+  const sessionId = String(location.state?.sessionId || `sess_${Date.now()}`);
 
   const participants = [myId, partnerId].sort();
   const roomName = `TradeSkill-${participants[0]}-${participants[1]}`.replace(/\s/g, '');
@@ -26,6 +29,7 @@ const Workspace = () => {
   const [role, setRole] = useState('teaching');
   const [teachingTime, setTeachingTime] = useState(0);
   const [learningTime, setLearningTime] = useState(0);
+  const [sessionNotes, setSessionNotes] = useState('');
   const [rating, setRating] = useState(0);
   const [callEnded, setCallEnded] = useState(false);
 
@@ -42,6 +46,48 @@ const Workspace = () => {
     return () => clearInterval(timer);
   }, [role]);
 
+  // Load session record if available
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const sess = await getItem('VideoSessions', { sessionId });
+        if (sess) {
+          setSessionNotes(sess.notes || '');
+          if (Array.isArray(sess.uploadedFiles)) setUploadedFiles(sess.uploadedFiles);
+          if (sess.finalRole) setRole(sess.finalRole);
+        }
+      } catch (err) {
+        console.error('Failed to load session record:', err);
+      }
+    };
+    loadSession();
+  }, [sessionId]);
+
+  // Save session helper
+  const saveSessionRecord = async (overrides = {}) => {
+    try {
+      const record = {
+        sessionId,
+        chatId: `chat_${[myId, partnerId].sort().join('_')}`,
+        roomName,
+        sessionLink,
+        hostUserId: myId,
+        partnerUserId: partnerId,
+        status: 'active',
+        notes: sessionNotes,
+        uploadedFiles: uploadedFiles.map(f => ({ name: f.name, url: f.url })),
+        finalRole: role,
+        teachingMinutes: Math.floor(teachingTime / 60),
+        learningMinutes: Math.floor(learningTime / 60),
+        updatedAt: Date.now(),
+        ...overrides
+      };
+      await putItem('VideoSessions', record);
+    } catch (error) {
+      console.error('Failed to save session record:', error);
+    }
+  };
+
   const format = (s) =>
     `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
@@ -56,38 +102,146 @@ const Workspace = () => {
     }
   };
 
-  const handleEndSession = () => {
+  // Persist files when uploaded
+  useEffect(() => {
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      saveSessionRecord();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadedFiles]);
+
+  // Persist notes when they change
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (sessionNotes !== undefined) saveSessionRecord();
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionNotes]);
+
+  const handleEndSession = async () => {
     const currentUser = JSON.parse(sessionStorage.getItem('currentUser')) || {};
-    const allUsers = JSON.parse(localStorage.getItem('allUsers')) || [];
 
-    const updatedMyData = {
-      ...currentUser,
-      swaps: (currentUser.swaps || 0) + 1,
-    };
+    try {
+      console.log('=== END SESSION ===');
+      console.log('Current user:', currentUser.name, 'Partner:', partnerName);
+      console.log('Partner object:', partner);
 
-    const updatedGlobalUsers = allUsers.map(user => {
-      if (user.email === currentUser.email || user.id === currentUser.id) {
-        return updatedMyData;
+      // mark session ended
+      await saveSessionRecord({ status: 'ended', endedAt: Date.now(), finalRole: role });
+      
+      // Create rating record
+      const ratingId = `rating_${Date.now()}`;
+      const ratingRecord = {
+        ratingId: ratingId,
+        sessionId: sessionId,
+        roomName: roomName,
+        sessionLink: sessionLink,
+        sessionNotes: sessionNotes,
+        uploadedFiles: uploadedFiles.map(f => ({ name: f.name, url: f.url })),
+        finalRole: role,
+        teachingMinutes: Math.floor(teachingTime / 60),
+        learningMinutes: Math.floor(learningTime / 60),
+        raterUserId: currentUser.userId,
+        raterEmail: currentUser.email,
+        ratedUserId: partner.userId,
+        ratedUserEmail: partner.email,
+        ratedUserName: partnerName,
+        rating: rating,
+        createdAt: new Date().toISOString(),
+        timestamp: Date.now()
+      };
+
+      // Save rating to Ratings table
+      await putItem('Ratings', ratingRecord);
+      console.log('Rating saved');
+
+      // Update current user's swap count
+      const updatedMyData = {
+        ...currentUser,
+        swaps: (currentUser.swaps || 0) + 1,
+      };
+
+      // Update session storage with new stats
+      sessionStorage.setItem('currentUser', JSON.stringify(updatedMyData));
+
+      // Persist updated user record to Users table so Profile shows changes
+      try {
+        await putItem('Users', updatedMyData);
+        console.log('My swaps updated');
+      } catch (err) {
+        console.error('Failed to update Users table with new swap count:', err);
       }
-      if (user.id === partnerId || user.email === partnerId) {
-        const oldRep = user.reputation || 0;
-        const newRepValue = oldRep === 0
-          ? rating
-          : (parseFloat(oldRep) + rating) / 2;
-        return {
-          ...user,
-          reputation: parseFloat(newRepValue.toFixed(1)),
-          swaps: (user.swaps || 0) + 1
-        };
+
+      // Update rated user's reputation
+      try {
+        console.log('=== UPDATING RATED USER ===');
+        console.log('Looking for rated user - userId:', partner.userId);
+        
+        if (partner.userId) {
+          // Get all users and find by userId
+          const allUsers = await scanItems('Users');
+          const ratedUser = allUsers.find(u => 
+            String(u.userId || u.id) === String(partner.userId)
+          );
+
+          if (ratedUser) {
+            console.log('✅ Found rated user:', ratedUser.name);
+            
+            const prevCount = Number(ratedUser.ratingCount ?? ratedUser.swaps ?? 0);
+            const prevRep = Number(ratedUser.ratingAverage ?? ratedUser.reputation ?? 0);
+            const newCount = prevCount + 1;
+            const newRep = ((prevRep * prevCount) + Number(rating || 0)) / newCount;
+            
+            const updatedRatedUser = {
+              ...ratedUser,
+              ratingAverage: newRep,
+              ratingCount: newCount,
+              // keep legacy fields for compatibility
+              reputation: newRep,
+              swaps: newCount
+            };
+
+            await putItem('Users', updatedRatedUser);
+            console.log('✅ Rated user updated:', ratedUser.name, 'New rating:', updatedRatedUser.ratingAverage);
+          } else {
+            console.warn('❌ Could not find rated user by userId:', partner.userId);
+          }
+        } else if (partner?.email) {
+          // Fallback to email
+          const users = await scanItems('Users');
+          const ratedUser = users.find(u => (u.email || '').toLowerCase() === (partner.email || '').toLowerCase());
+          
+          if (ratedUser) {
+            console.log('✅ Found rated user by email:', ratedUser.name);
+            
+            const prevCount = Number(ratedUser.ratingCount ?? ratedUser.swaps ?? 0);
+            const prevRep = Number(ratedUser.ratingAverage ?? ratedUser.reputation ?? 0);
+            const newCount = prevCount + 1;
+            const newRep = ((prevRep * prevCount) + Number(rating || 0)) / newCount;
+            
+            const updatedRatedUser = {
+              ...ratedUser,
+              ratingAverage: newRep,
+              ratingCount: newCount,
+              reputation: newRep,
+              swaps: newCount
+            };
+
+            await putItem('Users', updatedRatedUser);
+            console.log('✅ Rated user updated:', ratedUser.name, 'New rating:', updatedRatedUser.ratingAverage);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to update rated user reputation:', err);
       }
-      return user;
-    });
 
-    localStorage.setItem('allUsers', JSON.stringify(updatedGlobalUsers));
-    sessionStorage.setItem('currentUser', JSON.stringify(updatedMyData));
-
-    alert(`Session ended! You gave ${partnerName} a ${rating} star rating.`);
-    navigate('/profile');
+      alert(`Session ended! You gave ${partnerName} a ${rating} star rating.`);
+      navigate('/profile');
+    } catch (error) {
+      console.error('Failed to save rating:', error);
+      alert('Failed to end session. Please try again.');
+    }
   };
 
   return (
@@ -160,7 +314,14 @@ const Workspace = () => {
           </div>
           <button
             className="p-btn accent swap-main-btn"
-            onClick={() => setRole(role === 'teaching' ? 'learning' : 'teaching')}
+            onClick={() => {
+              const next = role === 'teaching' ? 'learning' : 'teaching';
+              setRole(next);
+              // record role change in session
+              saveSessionRecord({
+                roleHistory: (uploadedFiles && Array.isArray(uploadedFiles)) ? undefined : undefined
+              });
+            }}
           >
             Swap Role ⇌
           </button>
@@ -180,6 +341,8 @@ const Workspace = () => {
             <textarea
               className="notes-box"
               placeholder="Write shared concepts here..."
+              value={sessionNotes}
+              onChange={(e) => setSessionNotes(e.target.value)}
             />
           </div>
 

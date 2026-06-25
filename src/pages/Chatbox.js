@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { putItem, queryItems, scanItems } from '../awsConfig';
+import { getCanonicalId } from '../utils/idUtils';
 import './Chatbox.css';
 
 const Chatbox = () => {
@@ -10,12 +12,14 @@ const Chatbox = () => {
   const partner = location.state?.partner;
   const myData = JSON.parse(sessionStorage.getItem('currentUser')) || { name: "Guest" };
   const myName = myData.name;
-  const myId = myData.id || myName;
-  const partnerId = partner?.id || partner?.email || partner?.name || 'unknown';
 
-  const participants = [myId, partnerId].map(String).sort();
-  const chatKey = `chat_${participants[0]}_${participants[1]}`.replace(/\s/g, '');
-  const roomName = `TradeSkill-${participants[0]}-${participants[1]}`.replace(/\s/g, '');
+  // Prefer stable `userId` first, then email — keeps chat keys consistent across clients
+  const myIdentifier = getCanonicalId(myData);
+  const partnerIdentifier = getCanonicalId(partner);
+
+  const partners = [myIdentifier, partnerIdentifier].sort();
+  const chatId = `chat_${partners[0]}_${partners[1]}`.replace(/\s/g, '');
+  const roomName = `TradeSkill-${partners[0]}-${partners[1]}`.replace(/\s/g, '');
   const sessionLink = `https://meet.jit.si/${roomName}`;
 
   useEffect(() => {
@@ -24,40 +28,32 @@ const Chatbox = () => {
     }
   }, [myData, partner, navigate]);
 
+  useEffect(() => {
+    console.debug('[Chatbox] mount', { currentUser: myData, partner });
+  }, []);
+
   const [message, setMessage] = useState("");
-  const [chatHistory, setChatHistory] = useState(() => {
-    const saved = localStorage.getItem(chatKey);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [chatHistory, setChatHistory] = useState([]);
 
-  // Poll every 2 seconds
+  // Load messages from DynamoDB
   useEffect(() => {
-    const interval = setInterval(() => {
-      const saved = localStorage.getItem(chatKey);
-      if (saved) setChatHistory(JSON.parse(saved));
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [chatKey]);
-
-  // Listen for storage changes
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === chatKey) {
-        setChatHistory(e.newValue ? JSON.parse(e.newValue) : []);
+    const loadMessages = async () => {
+      try {
+        const messages = await queryItems('Messages', 
+          'chatId = :chatId',
+          { ':chatId': chatId }
+        );
+        setChatHistory(messages.sort((a, b) => a.timestamp - b.timestamp));
+      } catch (error) {
+        console.error('Failed to load messages:', error);
       }
     };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [chatKey]);
-
-  // Mark as read
-  useEffect(() => {
-    const inboxHeads = JSON.parse(localStorage.getItem('inbox_heads')) || {};
-    if (inboxHeads[chatKey] && inboxHeads[chatKey].receiverName === myName) {
-      inboxHeads[chatKey].unread = false;
-      localStorage.setItem('inbox_heads', JSON.stringify(inboxHeads));
-    }
-  }, [chatKey, myName]);
+    loadMessages();
+    
+    // Poll every 3 seconds for new messages
+    const interval = setInterval(loadMessages, 3000);
+    return () => clearInterval(interval);
+  }, [chatId]);
 
   // Auto-scroll
   useEffect(() => {
@@ -66,14 +62,18 @@ const Chatbox = () => {
     }
   }, [chatHistory]);
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
     if (!message.trim()) return;
 
+    const messageId = `msg_${Date.now()}`;
     const newMessage = {
-      id: Date.now(),
-      sender: myName,
+      messageId: messageId,
+      chatId: chatId,
+      senderEmail: myData.email,
+      senderName: myName,
       text: message,
+      timestamp: Date.now(),
       time: new Date().toLocaleTimeString([], { 
         hour: '2-digit', 
         minute: '2-digit' 
@@ -81,41 +81,73 @@ const Chatbox = () => {
       isInvite: false
     };
 
-    const currentSaved = JSON.parse(localStorage.getItem(chatKey)) || [];
-    const updatedHistory = [...currentSaved, newMessage];
-    setChatHistory(updatedHistory);
-    localStorage.setItem(chatKey, JSON.stringify(updatedHistory));
+    try {
+      console.debug('[Chatbox] send debug', {
+        myIdentifier,
+        partnerIdentifier,
+        chatId,
+        message
+      });
+      // Save message to Messages table
+      await putItem('Messages', newMessage);
+      
+      // Add to local state
+      setChatHistory(prev => [...prev, newMessage]);
 
-    // Save inbox — store PARTNER's data so receiver can navigate back correctly
-    const inboxHeads = JSON.parse(localStorage.getItem('inbox_heads')) || {};
-    inboxHeads[chatKey] = {
-      lastMessage: message,
-      senderId: myId,
-      receiverId: partnerId,
-      senderName: myName,
-      receiverName: partner.name,
-      time: new Date().getTime(),
-      unread: true,
-      // Store sender info so receiver knows who to chat with
-      senderData: {
-        id: myId,
-        name: myName,
-        email: myData.email,
-        teach: myData.skillsToTeach?.[0] || "Skills",
-        learn: myData.skillsToLearn?.[0] || "Knowledge",
-        skillsToTeach: myData.skillsToTeach,
-        skillsToLearn: myData.skillsToLearn
+      // Resolve recipient userId (prefer userId, fallback to email) so InboxHeads partition key matches recipient
+      let recipientUserId = partner?.userId || partner?.id || null;
+      if (!recipientUserId && partner?.email) {
+        try {
+          const users = await scanItems('Users');
+          const found = users.find(u => (u.email || '').toLowerCase() === (partner.email || '').toLowerCase());
+          if (found) recipientUserId = found.userId || found.id || found.email;
+        } catch (err) {
+          console.error('Failed to resolve recipient userId:', err);
+        }
       }
-    };
-    localStorage.setItem('inbox_heads', JSON.stringify(inboxHeads));
-    setMessage("");
+      const inboxUserId = String(recipientUserId || partner.email || partnerIdentifier || 'unknown');
+      console.debug('[Chatbox] resolved inboxUserId', { recipientUserId, inboxUserId });
+
+      // Save to InboxHeads table using resolved inboxUserId as PK
+      const inboxRes = await putItem('InboxHeads', {
+        userId: inboxUserId,
+        chatId: String(chatId),
+        lastMessage: message,
+        senderId: String(myIdentifier),
+        senderEmail: myData.email,
+        senderName: myName,
+        receiverName: partner.name,
+        timestamp: Date.now(),
+        unread: true,
+        senderData: {
+          userId: myData.userId || String(myIdentifier),
+          id: String(myIdentifier),
+          name: myName,
+          email: myData.email,
+          teach: myData.skillsToTeach?.[0] || "Skills",
+          learn: myData.skillsToLearn?.[0] || "Knowledge",
+          skillsToTeach: myData.skillsToTeach,
+          skillsToLearn: myData.skillsToLearn
+        }
+      });
+      console.debug('[Chatbox] InboxHeads put result', inboxRes);
+
+      setMessage("");
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
   };
 
-  const handleEnterSession = () => {
+  const handleEnterSession = async () => {
+    const messageId = `msg_${Date.now()}`;
+    const sessionId = `sess_${Date.now()}`;
     const inviteMessage = {
-      id: Date.now(),
-      sender: myName,
+      messageId: messageId,
+      chatId: chatId,
+      senderEmail: myData.email,
+      senderName: myName,
       text: `🚀 ${myName} started a session! Click to Join.`,
+      timestamp: Date.now(),
       time: new Date().toLocaleTimeString([], { 
         hour: '2-digit', 
         minute: '2-digit' 
@@ -124,32 +156,73 @@ const Chatbox = () => {
       sessionLink: sessionLink
     };
 
-    const currentSaved = JSON.parse(localStorage.getItem(chatKey)) || [];
-    const updated = [...currentSaved, inviteMessage];
-    localStorage.setItem(chatKey, JSON.stringify(updated));
-    setChatHistory(updated);
+    try {
+      // Save invite message to Messages table
+      const msgRes = await putItem('Messages', inviteMessage);
+      console.debug('[Chatbox] Messages put result', msgRes);
+      setChatHistory(prev => [...prev, inviteMessage]);
 
-    const inboxHeads = JSON.parse(localStorage.getItem('inbox_heads')) || {};
-    inboxHeads[chatKey] = {
-      lastMessage: `🚀 ${myName} started a session!`,
-      senderId: myId,
-      receiverId: partnerId,
-      senderName: myName,
-      receiverName: partner.name,
-      time: new Date().getTime(),
-      unread: true,
-      senderData: {
-        id: myId,
-        name: myName,
-        email: myData.email,
-        teach: myData.skillsToTeach?.[0] || "Skills",
-        learn: myData.skillsToLearn?.[0] || "Knowledge",
-        skillsToTeach: myData.skillsToTeach,
-        skillsToLearn: myData.skillsToLearn
+      // Create a VideoSessions record for live session state
+      const sessionRecord = {
+        sessionId: sessionId,
+        chatId: chatId,
+        roomName: roomName,
+        sessionLink: sessionLink,
+        hostUserId: String(myIdentifier),
+        hostEmail: myData.email,
+        partnerUserId: String(partnerIdentifier),
+        status: 'active',
+        startedAt: Date.now(),
+        notes: '',
+        uploadedFiles: [],
+        roleHistory: [{ userId: String(myIdentifier), role: 'teaching', at: Date.now() }]
+      };
+
+      const sessRes = await putItem('VideoSessions', sessionRecord);
+      console.debug('[Chatbox] VideoSessions put result', sessRes);
+
+      // Resolve recipient id for InboxHeads
+      let recipientUserId = partner?.userId || partner?.id || null;
+      if (!recipientUserId && partner?.email) {
+        try {
+          const users = await scanItems('Users');
+          const found = users.find(u => (u.email || '').toLowerCase() === (partner.email || '').toLowerCase());
+          if (found) recipientUserId = found.userId || found.id || found.email;
+        } catch (err) {
+          console.error('Failed to resolve recipient userId for invite:', err);
+        }
       }
-    };
-    localStorage.setItem('inbox_heads', JSON.stringify(inboxHeads));
-    navigate('/workspace', { state: { partner: partner } });
+      const inboxUserId = String(recipientUserId || partner.email || partnerIdentifier || 'unknown');
+      console.debug('[Chatbox] invite resolved inboxUserId', { recipientUserId, inboxUserId });
+
+      // Update InboxHeads
+      const inboxRes = await putItem('InboxHeads', {
+        userId: inboxUserId,
+        chatId: String(chatId),
+        lastMessage: `🚀 ${myName} started a session!`,
+        senderId: String(myIdentifier),
+        senderEmail: myData.email,
+        senderName: myName,
+        receiverName: partner.name,
+        timestamp: Date.now(),
+        unread: true,
+        senderData: {
+          userId: myData.userId || String(myIdentifier),
+          id: String(myIdentifier),
+          name: myName,
+          email: myData.email,
+          teach: myData.skillsToTeach?.[0] || "Skills",
+          learn: myData.skillsToLearn?.[0] || "Knowledge",
+          skillsToTeach: myData.skillsToTeach,
+          skillsToLearn: myData.skillsToLearn
+        }
+      });
+      console.debug('[Chatbox] InboxHeads put result (invite)', inboxRes);
+
+      navigate('/workspace', { state: { partner: partner, sessionId } });
+    } catch (error) {
+      console.error('Failed to create session invite:', error);
+    }
   };
 
   return (
@@ -192,13 +265,13 @@ const Chatbox = () => {
           )}
           {chatHistory.map((msg) => (
             <div
-              key={msg.id}
-              className={`msg-bubble-wrapper ${msg.sender === myName ? 'sent' : 'received'}`}
+              key={msg.messageId || msg.id || msg.timestamp}
+              className={`msg-bubble-wrapper ${msg.senderName === myName ? 'sent' : 'received'}`}
             >
               <div className="msg-bubble">
                 {msg.isInvite ? (
                   <p>
-                    🚀 {msg.sender} started a session!{' '}
+                    🚀 {msg.senderName} started a session!{' '}
                     <span
                       onClick={() => navigate('/workspace', { state: { partner: partner } })}
                       style={{

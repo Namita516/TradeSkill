@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { scanItems } from '../awsConfig';
+import { getCanonicalId } from '../utils/idUtils';
 import './Home.css';
 
 const Home = () => {
@@ -8,27 +10,48 @@ const Home = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    const allUsers = JSON.parse(localStorage.getItem('allUsers')) || [];
-    const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
+    const loadUsers = async () => {
+      try {
+        const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
+        
+        // Query Users table from DynamoDB
+        const allUsers = await scanItems('Users');
+        
+        // Filter out current user and map to partner format
+        const otherUsers = allUsers.filter(u => u.email !== currentUser?.email && u.userId !== currentUser?.userId);
+        const mappedPartners = otherUsers.map(u => ({
+          id: getCanonicalId(u),
+          userId: u.userId,
+          email: u.email,
+          name: u.name,
+          rating: u.ratingAverage ?? u.reputation ?? "New",
+          ratingCount: u.ratingCount ?? u.swaps ?? 0,
+          swaps: u.swaps ?? u.ratingCount ?? 0,
+          teach: u.skillsToTeach?.length > 0 ? u.skillsToTeach.join(", ") : "Skills coming soon",
+          learn: u.skillsToLearn?.length > 0 ? u.skillsToLearn.join(", ") : "Knowledge seeker",
+          bio: u.bio,
+          isNew: true
+        }));
 
-    const otherUsers = allUsers.filter(u => u.email !== currentUser?.email && u.id !== currentUser?.id);
-    const mappedPartners = otherUsers.map(u => ({
-      id: u.id || u.email,
-      email: u.email,
-      name: u.name,
-      rating: u.reputation || "New",
-      teach: u.skillsToTeach?.length > 0 ? u.skillsToTeach.join(", ") : "Skills coming soon",
-      learn: u.skillsToLearn?.length > 0 ? u.skillsToLearn.join(", ") : "Knowledge seeker",
-      bio: u.bio,
-      isNew: true
-    }));
+        // Demo cards as fallback
+        const demoCards = [
+          { id: 1, name: "Sarah Chen", rating: 4.9, teach: "Digital Illustration", learn: "React JS", bio: "Pro artist looking to dive into web dev." },
+          { id: 2, name: "Marcus Vane", rating: 4.7, teach: "French", learn: "Cooking", bio: "Native speaker. Want to learn Italian pasta secrets." }
+        ];
 
-    const demoCards = [
-      { id: 1, name: "Sarah Chen", rating: 4.9, teach: "Digital Illustration", learn: "React JS", bio: "Pro artist looking to dive into web dev." },
-      { id: 2, name: "Marcus Vane", rating: 4.7, teach: "French", learn: "Cooking", bio: "Native speaker. Want to learn Italian pasta secrets." }
-    ];
+        setPartners([...mappedPartners, ...demoCards]);
+      } catch (error) {
+        console.error('Failed to load users:', error);
+        // Fallback to demo cards on error
+        const demoCards = [
+          { id: 1, name: "Sarah Chen", rating: 4.9, teach: "Digital Illustration", learn: "React JS", bio: "Pro artist looking to dive into web dev." },
+          { id: 2, name: "Marcus Vane", rating: 4.7, teach: "French", learn: "Cooking", bio: "Native speaker. Want to learn Italian pasta secrets." }
+        ];
+        setPartners(demoCards);
+      }
+    };
 
-    setPartners([...mappedPartners, ...demoCards]);
+    loadUsers();
   }, []);
 
   const filteredPartners = partners.filter(partner =>
@@ -79,7 +102,12 @@ const Home = () => {
                 <div className="avatar-sm">{partner.name.charAt(0).toUpperCase()}</div>
                 <div>
                   <h4>{partner.name}</h4>
-                  <span className="rating">⭐ {partner.rating}</span>
+                  <div className="partner-meta">
+                    <span className="rating">⭐ {typeof partner.rating === 'number' ? partner.rating.toFixed(1) : partner.rating}</span>
+                    {partner.swaps !== undefined && (
+                      <span className="swap-count">· {partner.swaps} swaps</span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="trade-tags">
