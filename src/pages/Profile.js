@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { putItem, queryItems, scanItems } from '../awsConfig';
+import { putItem, queryItems } from '../awsConfig';
 import './Profile.css';
 
 const Profile = () => {

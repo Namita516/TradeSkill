@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { putItem, getItem, scanItems } from '../awsConfig';
+import { putItem, scanItems } from '../awsConfig';
 import './LoginSignup.css';
 
 const LoginSignup = () => {
