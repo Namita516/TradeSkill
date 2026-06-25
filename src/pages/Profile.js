@@ -191,13 +191,16 @@ const Profile = () => {
 
         <div className="user-stats">
           <div className="stat-item">
-            <p className="stat-num">{user.ratingAverage !== undefined ? `${Number(user.ratingAverage * 20).toFixed(0)}%` : 'New'}</p>
-            <p className="stat-label">Reputation</p>
-          </div>
-          <div className="stat-item">
-            <p className="stat-num">{user.ratingCount || user.swaps || 0}</p>
-            <p className="stat-label">Ratings</p>
-          </div>
+  <p className="stat-num">
+      {user.reputation || 0}%
+  </p>
+  <p className="stat-label">Reputation</p>
+</div>
+
+<div className="stat-item">
+  <p className="stat-num">{user.swaps || 0}</p>
+  <p className="stat-label">Swaps</p>
+</div>
         </div>
 
         <p className="user-bio">{user.bio}</p>

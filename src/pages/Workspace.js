@@ -120,129 +120,108 @@ const Workspace = () => {
   }, [sessionNotes]);
 
   const handleEndSession = async () => {
-    const currentUser = JSON.parse(sessionStorage.getItem('currentUser')) || {};
+  const currentUser =
+    JSON.parse(sessionStorage.getItem("currentUser")) || {};
 
-    try {
-      console.log('=== END SESSION ===');
-      console.log('Current user:', currentUser.name, 'Partner:', partnerName);
-      console.log('Partner object:', partner);
+  if (rating === 0) {
+    alert("Please rate your partner before ending session.");
+    return;
+  }
 
-      // mark session ended
-      await saveSessionRecord({ status: 'ended', endedAt: Date.now(), finalRole: role });
-      
-      // Create rating record
-      const ratingId = `rating_${Date.now()}`;
-      const ratingRecord = {
-        ratingId: ratingId,
-        sessionId: sessionId,
-        roomName: roomName,
-        sessionLink: sessionLink,
-        sessionNotes: sessionNotes,
-        uploadedFiles: uploadedFiles.map(f => ({ name: f.name, url: f.url })),
-        finalRole: role,
-        teachingMinutes: Math.floor(teachingTime / 60),
-        learningMinutes: Math.floor(learningTime / 60),
-        raterUserId: currentUser.userId,
-        raterEmail: currentUser.email,
-        ratedUserId: partner.userId,
-        ratedUserEmail: partner.email,
-        ratedUserName: partnerName,
-        rating: rating,
-        createdAt: new Date().toISOString(),
-        timestamp: Date.now()
-      };
+  try {
+    // End session record
+    await saveSessionRecord({
+      status: "ended",
+      endedAt: Date.now(),
+      finalRole: role
+    });
 
-      // Save rating to Ratings table
-      await putItem('Ratings', ratingRecord);
-      console.log('Rating saved');
+    // Save rating history
+    await putItem("Ratings", {
+      ratingId: `rating_${Date.now()}`,
+      sessionId,
+      raterUserId: currentUser.userId,
+      raterEmail: currentUser.email,
+      ratedUserId: partner.userId,
+      ratedUserEmail: partner.email,
+      ratedUserName: partnerName,
+      rating,
+      createdAt: new Date().toISOString(),
+      timestamp: Date.now()
+    });
 
-      // Update current user's swap count
-      const updatedMyData = {
-        ...currentUser,
-        swaps: (currentUser.swaps || 0) + 1,
-      };
+    // Load all users
+    const allUsers = await scanItems("Users");
 
-      // Update session storage with new stats
-      sessionStorage.setItem('currentUser', JSON.stringify(updatedMyData));
+    const me = allUsers.find(
+      u =>
+        String(u.userId) === String(currentUser.userId) ||
+        String(u.email).toLowerCase() ===
+          String(currentUser.email).toLowerCase()
+    );
 
-      // Persist updated user record to Users table so Profile shows changes
-      try {
-        await putItem('Users', updatedMyData);
-        console.log('My swaps updated');
-      } catch (err) {
-        console.error('Failed to update Users table with new swap count:', err);
-      }
+    const partnerUser = allUsers.find(
+      u =>
+        String(u.userId) === String(partner.userId) ||
+        String(u.email).toLowerCase() ===
+          String(partner.email).toLowerCase()
+    );
 
-      // Update rated user's reputation
-      try {
-        console.log('=== UPDATING RATED USER ===');
-        console.log('Looking for rated user - userId:', partner.userId);
-        
-        if (partner.userId) {
-          // Get all users and find by userId
-          const allUsers = await scanItems('Users');
-          const ratedUser = allUsers.find(u => 
-            String(u.userId || u.id) === String(partner.userId)
-          );
+    // -----------------------------
+    // UPDATE PARTNER REPUTATION
+    // -----------------------------
+    if (partnerUser) {
+      const oldCount = Number(partnerUser.ratingCount || 0);
+      const oldAverage = Number(partnerUser.ratingAverage || 0);
 
-          if (ratedUser) {
-            console.log('✅ Found rated user:', ratedUser.name);
-            
-            const prevCount = Number(ratedUser.ratingCount ?? ratedUser.swaps ?? 0);
-            const prevRep = Number(ratedUser.ratingAverage ?? ratedUser.reputation ?? 0);
-            const newCount = prevCount + 1;
-            const newRep = ((prevRep * prevCount) + Number(rating || 0)) / newCount;
-            
-            const updatedRatedUser = {
-              ...ratedUser,
-              ratingAverage: newRep,
-              ratingCount: newCount,
-              // keep legacy fields for compatibility
-              reputation: newRep,
-              swaps: newCount
-            };
+      const newCount = oldCount + 1;
 
-            await putItem('Users', updatedRatedUser);
-            console.log('✅ Rated user updated:', ratedUser.name, 'New rating:', updatedRatedUser.ratingAverage);
-          } else {
-            console.warn('❌ Could not find rated user by userId:', partner.userId);
-          }
-        } else if (partner?.email) {
-          // Fallback to email
-          const users = await scanItems('Users');
-          const ratedUser = users.find(u => (u.email || '').toLowerCase() === (partner.email || '').toLowerCase());
-          
-          if (ratedUser) {
-            console.log('✅ Found rated user by email:', ratedUser.name);
-            
-            const prevCount = Number(ratedUser.ratingCount ?? ratedUser.swaps ?? 0);
-            const prevRep = Number(ratedUser.ratingAverage ?? ratedUser.reputation ?? 0);
-            const newCount = prevCount + 1;
-            const newRep = ((prevRep * prevCount) + Number(rating || 0)) / newCount;
-            
-            const updatedRatedUser = {
-              ...ratedUser,
-              ratingAverage: newRep,
-              ratingCount: newCount,
-              reputation: newRep,
-              swaps: newCount
-            };
+      const newAverage =
+        ((oldAverage * oldCount) + rating) /
+        newCount;
 
-            await putItem('Users', updatedRatedUser);
-            console.log('✅ Rated user updated:', ratedUser.name, 'New rating:', updatedRatedUser.ratingAverage);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to update rated user reputation:', err);
-      }
+      const reputationPercentage =
+        Math.round((newAverage / 5) * 100);
 
-      alert(`Session ended! You gave ${partnerName} a ${rating} star rating.`);
-      navigate('/profile');
-    } catch (error) {
-      console.error('Failed to save rating:', error);
-      alert('Failed to end session. Please try again.');
+      await putItem("Users", {
+        ...partnerUser,
+        ratingAverage: Number(newAverage.toFixed(2)),
+        ratingCount: newCount,
+        reputation: reputationPercentage,
+        swaps: Number(partnerUser.swaps || 0) + 1,
+        updatedAt: Date.now()
+      });
     }
-  };
+
+    // -----------------------------
+    // UPDATE CURRENT USER SWAPS
+    // -----------------------------
+    if (me) {
+      const updatedMe = {
+        ...me,
+        swaps: Number(me.swaps || 0) + 1,
+        updatedAt: Date.now()
+      };
+
+      await putItem("Users", updatedMe);
+
+      sessionStorage.setItem(
+        "currentUser",
+        JSON.stringify(updatedMe)
+      );
+    }
+
+    alert(
+      `Session completed!\n\nYou rated ${partnerName} ${rating} stars.`
+    );
+
+    navigate("/profile");
+
+  } catch (error) {
+    console.error(error);
+    alert("Failed to complete session.");
+  }
+};
 
   return (
     <div className="workspace-wrapper">
