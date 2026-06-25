@@ -10,8 +10,8 @@ const Chatbox = () => {
   const scrollRef = useRef(null);
 
   const partner = location.state?.partner;
-  const myData = JSON.parse(sessionStorage.getItem('currentUser')) || { name: "Guest" };
-  const myName = myData.name;
+// eslint-disable-next-line react-hooks/exhaustive-deps
+const myData = JSON.parse(sessionStorage.getItem('currentUser')) || { name: "Guest" };  const myName = myData.name;
 
   // Prefer stable `userId` first, then email — keeps chat keys consistent across clients
   const myIdentifier = getCanonicalId(myData);
@@ -23,10 +23,11 @@ const Chatbox = () => {
   const sessionLink = `https://meet.jit.si/${roomName}`;
 
   useEffect(() => {
-    if (!myData?.email || !partner?.name) {
-      navigate('/home', { replace: true });
-    }
-  }, [myData, partner, navigate]);
+  if (!myData?.email || !partner?.name) {
+    navigate('/home', { replace: true });
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [navigate]);
 
   useEffect(() => {
     console.debug('[Chatbox] mount', { currentUser: myData, partner });
